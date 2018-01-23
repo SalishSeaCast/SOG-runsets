@@ -95,7 +95,7 @@ def populate_editfile_dict(
     editfile_dict.update({
         'initial_conditions': {
             'init_datetime': {
-                'value': datetime_start.strftime('%Y-%m-%d %H:%M:%S'),
+                'value': datetime_start,
             },
             'CTD_file': {
                 'value': os.path.join(initial_path, ctd_dir, init_files[0]),
@@ -105,7 +105,7 @@ def populate_editfile_dict(
             },
         },
         'end_datetime': {
-            'value': datetime_end.strftime('%Y-%m-%d %H:%M:%S'),
+            'value': datetime_end,
         },
         'timeseries_results': {
             'std_physics': {
@@ -184,7 +184,7 @@ def populate_editfile_dict(
 # ------------------ End local funtion definitions ----------------------------
 
 # Read batch yaml
-with open('SOG_test.yaml', 'r') as f:
+with open('SOG_river.yaml', 'r') as f:
     data = yaml.load(f)
 
 # Paths
@@ -199,7 +199,7 @@ nuts_dir = data['initialization']['nutrients_directory']
 vary_forcings = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 ]
-if 'forcing1' in data:
+if 'forcing' in data:
     if 'vary' in data['forcing']:
         vary_forcings = data['forcing']['vary']
 
@@ -212,7 +212,8 @@ if 'freshwater_chemistry' in data:
     river_pH = data['freshwater_chemistry']['river_pH']
 
 # Build root directories
-subprocess.call(['mkdir', 'editfiles'])
+subprocess.call(['mkdir', data['batch_name']])
+subprocess.call(['mkdir', os.path.join(data['batch_name'], 'editfiles')])
 subprocess.call(['mkdir', results_path])
 
 # Initialize batchfile dict
@@ -272,23 +273,33 @@ for datetimes, init_files in zip(
                 if vary_river_chem:
                     editfile_dict['physics'] = {
                         'fresh_water': {'river_CO2_chemistry': {
-                            'river_TA_record': TA[0],
-                            'river_total_alkalinity': TA[1],
-                            'river_pH': pH,
+                            'river_TA_record': {'value': TA[0]},
+                            'river_total_alkalinity': {'value': TA[1]},
+                            'river_pH': {'value': pH},
                         }}
                     }
                     if TA[0]:
                         TA_val = 'var'
+                        editfile_dict['forcing_data'] = {
+                            'major_river_forcing_file': {
+                                'value': '../SOG-forcing/rivers/FraserTA.dat',
+                            },
+                        }
                     else:
                         TA_val = str(TA[1])
                     chem_tag = chem_tag + '_TA{}pH{:.0f}'.format(TA_val, pH*10)
 
                 # Build paths and directories
                 editfile_path = os.path.join(
-                    'editfiles', str(run_year), 'editfile_' + chem_tag,
+                    data['batch_name'], 'editfiles', str(run_year),
+                    'editfile_' + chem_tag,
                 )
                 run_path = os.path.join(results_path, str(run_year), chem_tag)
                 subprocess.call(['mkdir', run_path])
+                subprocess.call([
+                    'mkdir', os.path.join(run_path, 'timeseries'),
+                ])
+                subprocess.call(['mkdir', os.path.join(run_path, 'profiles')])
 
                 # Build editfile
                 editfile_dict = populate_editfile_dict(
@@ -298,12 +309,20 @@ for datetimes, init_files in zip(
 
                 # Append run list in batchfile
                 batchfile_dict['jobs'].append({
-                    chem_tag: {'edit_files': [editfile_path]}
+                    chem_tag: {
+                        'edit_files': [editfile_path],
+                        'outfile': os.path.join(
+                            run_path, '{}.out'.format(chem_tag)
+                        ),
+                    }
                 })
 
                 # Write editfile yaml
                 with open(editfile_path, 'w') as f:
                     yaml.dump(editfile_dict, f, default_flow_style=False)
+
+                # Clear forcing data key from editfile dict
+                editfile_dict.pop('forcing_data', None)
 
 with open('run_{}_{}'.format(data['machine'], data['batch_name']), 'w') as f:
     yaml.dump(batchfile_dict, f, default_flow_style=False)
