@@ -188,6 +188,7 @@ with open('SOG_river.yaml', 'r') as f:
     data = yaml.load(f)
 
 # Paths
+editfile_dir = os.path.join(data['batch_name'], 'editfiles')
 results_path = os.path.join(
     data['paths']['runs_directory'], data['batch_name'],
 )
@@ -213,7 +214,7 @@ if 'freshwater_chemistry' in data:
 
 # Build root directories
 subprocess.call(['mkdir', data['batch_name']])
-subprocess.call(['mkdir', os.path.join(data['batch_name'], 'editfiles')])
+subprocess.call(['mkdir', editfile_dir])
 subprocess.call(['mkdir', results_path])
 
 # Initialize batchfile dict
@@ -234,7 +235,7 @@ for datetimes, init_files in zip(
     run_year = parse(datetimes[0]).year + 1
 
     # Build directories
-    subprocess.call(['mkdir', os.path.join('editfiles', str(run_year))])
+    subprocess.call(['mkdir', os.path.join(editfile_dir, str(run_year))])
     subprocess.call(['mkdir', os.path.join(results_path, str(run_year))])
 
     # Loop through forcing scenarios
@@ -291,8 +292,7 @@ for datetimes, init_files in zip(
 
                 # Build paths and directories
                 editfile_path = os.path.join(
-                    data['batch_name'], 'editfiles', str(run_year),
-                    'editfile_' + chem_tag,
+                    editfile_dir, str(run_year), 'editfile_' + chem_tag,
                 )
                 run_path = os.path.join(results_path, str(run_year), chem_tag)
                 subprocess.call(['mkdir', run_path])
@@ -324,5 +324,8 @@ for datetimes, init_files in zip(
                 # Clear forcing data key from editfile dict
                 editfile_dict.pop('forcing_data', None)
 
-with open('run_{}_{}'.format(data['machine'], data['batch_name']), 'w') as f:
+batchfile_path = os.path.join(
+    'run_{}_{}'.format(data['machine'], data['batch_name']),
+)
+with open(batchfile_path, 'w') as f:
     yaml.dump(batchfile_dict, f, default_flow_style=False)
