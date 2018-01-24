@@ -225,6 +225,9 @@ batchfile_dict = {
     'jobs': [],
 }
 
+# Initialize run list
+run_list = []
+
 # Loop through datetimes
 for datetimes, init_files in zip(
     data['initialization']['datetimes'],
@@ -324,8 +327,11 @@ for datetimes, init_files in zip(
                 # Clear forcing data key from editfile dict
                 editfile_dict.pop('forcing_data', None)
 
-batchfile_path = os.path.join(
-    'run_{}_{}'.format(data['machine'], data['batch_name']),
-)
-with open(batchfile_path, 'w') as f:
+                # Export run_path
+                run_list.append(run_path)
+
+with open('run_{}_{}'.format(data['machine'], data['batch_name']), 'w') as f:
     yaml.dump(batchfile_dict, f, default_flow_style=False)
+
+with open(os.path.join(data['batch_name'], 'run_list.yaml'), 'w') as f:
+    yaml.dump({'run_list': run_list}, f, default_flow_style=False)
